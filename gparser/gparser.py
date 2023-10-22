@@ -13,7 +13,7 @@ class GcodeLine:
         self.params = params
         self.comment = comment
 
-    def decode(
+    def encode(
             self,
     ) -> str:
         command_str = ''
@@ -101,7 +101,7 @@ class GcodeParser:
     ) -> None:
         gcodes: str = ''
         for gcode in self.gline:
-            gcodes += gcode.decode() + '\n'
+            gcodes += gcode.encode() + '\n'
 
         with open(file_path, 'w') as f:
             f.write(gcodes)
