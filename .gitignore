@@ -161,3 +161,4 @@ cython_debug/
 
 # nc file
 **.nc
+!example/sample.nc
