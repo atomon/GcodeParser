@@ -2,6 +2,7 @@ from typing import Any, Optional
 from pathlib import Path
 import re
 import copy
+import warnings
 
 
 class GcodeLine:
@@ -56,6 +57,28 @@ class GcodeParser:
     
     def __repr__(self) -> str:
         return "{}".format("\n".join(repr(x) for x in self.glines))
+    
+    def _check_uniquely_decodable(
+            self,
+            texts: str
+    ) -> None:
+        i = 1
+        for gline, text in zip(self.glines, texts.split("\n")):
+            if gline.encode() != text.strip():
+                correct = False
+
+                # Exception for FlatCAM  (M05 == M5)
+                if gline.command[0] in ['M', 'T']: 
+                    correct = gline.command[1] == int(text.strip()[1:])
+
+                # Exception for FlatCAM  (G00 Z15.0000 == G00 Z15.00)
+                if gline.command == ('G', 0):
+                    correct = gline.params == {'Z': 15.0}
+
+                # assert
+                assert correct, f'Load error [{i} line]: (load, correct) -> ({gline}, {text})'
+                warnings.warn(f'[{i} line] {gline} {text.strip()}')
+            i += 1
 
     @classmethod
     def from_flatcam(
@@ -104,7 +127,11 @@ class GcodeParser:
 
             gcodeline.append(GcodeLine(command, params, comment))
 
-        return cls(gcodeline)
+        # Check for correct parsing
+        gparser = cls(gcodeline)
+        gparser._check_uniquely_decodable(texts)
+
+        return gparser
 
     def save(
             self,
@@ -177,15 +204,15 @@ class GcodeParser:
 
         Example:
             対象コード
-            >>> G0 X46.2033 Y23.673 Z23.6739
-                G10 X46.2033 Y23.673 Z23.6739
+            >>> G00 X46.2033 Y23.6730 Z23.6739
+                G10 X46.2033 Y23.6730 Z23.6739
                 (asdfbth12367G12 X12)
-                G10 X46.2033 Y23.673 Z23.6739
+                G10 X46.2033 Y23.6730 Z23.6739
                 (asdfbth12367G12 X12)
                 M30
 
             検索コード
-            >>> G10 X46.2033 Y23.673 Z23.6739
+            >>> G10 X46.2033 Y23.6730 Z23.6739
                 (asdfbth12367G12 X12)
 
             返り値
@@ -208,16 +235,16 @@ class GcodeParser:
 
 
 if __name__ == "__main__":
-    gcode = """G0 X46.2033 Y23.673 Z23.6739
-               G10 X46.2033 Y23.673 Z23.6739
+    gcode = """G00 X46.2033 Y23.6730 Z23.6739
+               G10 X46.2033 Y23.6730 Z23.6739
                (asdfbth12367G12 X12)
-               G0 X46.2033 Y23.673 Z23.
-               G0 X46.2033 Y23.673 Z23.6739 (asdfrg)
-               G10 X46.2033 Y23.673 Z23.6739
+               G00 X46.2033 Y23.6730 Z23.0000
 
+               G00 X46.2033 Y23.6730 Z23.6739 (asdfrg)
+               G10 X46.2033 Y23.6730 Z23.6739
                M30"""
-    gcode_match = """(asdfbth12367G12 X12)
-               G0 X46.2033 Y23.673 Z23."""
+    gcode_match = """G00 X46.2033 Y23.6730 Z23.6739
+                     G10 X46.2033 Y23.6730 Z23.6739"""
     test_path = Path('a.nc')
 
     # Load Gcode
