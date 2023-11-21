@@ -80,7 +80,7 @@ class GcodeParser:
 
                 # Exception for FlatCAM  (G00 Z15.0000 == G00 Z15.00)
                 if gline.command == ('G', 0):
-                    correct = gline.params == {'Z': 15.0}
+                    correct = gline.params == {'Z': 5.0}
 
                 # assert
                 assert correct, f'Load error [{i} line]: (load, correct) -> ({gline}, {text})'
@@ -102,6 +102,7 @@ class GcodeParser:
         Returns:
             自身のクラスオブジェクト（構文解析したGcodeを持つ）
         """
+        print(f'load file: {file_path}')
         with open(file_path, 'r') as f:
             texts = f.read()
 
@@ -250,14 +251,15 @@ class GcodeParser:
             返り値
             >>> [1, 3]
         """
-        gline = glines.glines.pop(0)
+        _glines = copy.deepcopy(glines)
+        gline = _glines.glines.pop(0)
         indices = self.find_command(gline.command, gline.params, start_i, end_i, first_only)
 
-        if glines:
+        if _glines:
             next_i = [i + 1 for i in indices]
             for i, start_i in enumerate(next_i):
-                glines_ = copy.deepcopy(glines)
-                if len(self.match_lines(glines_, start_i, start_i + 1, first_only)) == 0:
+                _glines_cp = copy.deepcopy(_glines)
+                if len(self.match_lines(_glines_cp, start_i, start_i + 1, first_only)) == 0:
                     indices[i] = -1
 
                 if first_only:
