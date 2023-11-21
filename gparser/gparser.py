@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Iterable, Optional
 from pathlib import Path
 import re
 import copy
@@ -49,26 +49,33 @@ class GcodeParser:
     def __init__(self, gcodelines: list["GcodeLine"]) -> None:
         self.glines = gcodelines
 
-    def __iter__(self) -> 'GcodeLine':
+    def __iter__(self) -> Iterable["GcodeLine"]:
         yield from self.glines
 
     def __len__(self) -> int:
         return len(self.glines)
-    
+
     def __repr__(self) -> str:
         return "{}".format("\n".join(repr(x) for x in self.glines))
-    
+
     def _check_uniquely_decodable(
             self,
             texts: str
     ) -> None:
+        """一意復号可能のチェック
+
+        構文解析したデータを再度ncファイルに戻りしたとき，元のncファイルと一致するかどうか確認
+
+        Args:
+            texts: 元のncファイルのテキスト
+        """
         i = 1
         for gline, text in zip(self.glines, texts.split("\n")):
             if gline.encode() != text.strip():
                 correct = False
 
                 # Exception for FlatCAM  (M05 == M5)
-                if gline.command[0] in ['M', 'T']: 
+                if gline.command[0] in ['M', 'T']:
                     correct = gline.command[1] == int(text.strip()[1:])
 
                 # Exception for FlatCAM  (G00 Z15.0000 == G00 Z15.00)
@@ -85,6 +92,16 @@ class GcodeParser:
             cls,
             file_path: Path
     ) -> "GcodeParser":
+        """ncファイルから構文解析
+
+        各行をコマンド，パラメータ，コメントで分ける
+
+        Args:
+            file_path: ncファイルのファイルパス
+
+        Returns:
+            自身のクラスオブジェクト（構文解析したGcodeを持つ）
+        """
         with open(file_path, 'r') as f:
             texts = f.read()
 
@@ -95,6 +112,16 @@ class GcodeParser:
             cls,
             texts: str
     ) -> "GcodeParser":
+        """テキストデータから構文解析
+
+        各行をコマンド，パラメータ，コメントで分ける
+
+        Args:
+            texts: 改行を含むGcodeのtextデータ
+
+        Returns:
+            自身のクラスオブジェクト（構文解析したGcodeを持つ）
+        """
         re_not_comennt = r'(?!\( *.+)'  # commnet flag: ()
         re_command = r'(G|M|T)(\d+)'
         re_param = r'(([ \t]*(?!G|M|g|m)[A-Z][-\d\.]*)*)'
@@ -137,6 +164,11 @@ class GcodeParser:
             self,
             file_path: Path
     ) -> None:
+        """ncファイルとして保存
+
+        Args:
+            file_path: 保存するファイルパス
+        """
         gcodes: str = ''
         for gcode in self.glines:
             gcodes += gcode.encode() + '\n'
@@ -149,7 +181,7 @@ class GcodeParser:
             command: tuple[str, int],
             params: Optional[dict] = None,
             start_i: int = 0,
-            end_i: int = None,
+            end_i: Optional[int] = None,
             first_only: bool = False
     ) -> list[int]:
         """指定したコマンドとマッチする index を検索する
@@ -174,16 +206,16 @@ class GcodeParser:
 
             index.append(start_i + i)
 
-            if first_only == True:
+            if first_only:
                 break
 
         return index
-    
+
     def match_lines(
             self,
             glines: "GcodeParser",
             start_i: int = 0,
-            end_i: int = None,
+            end_i: Optional[int] = None,
             first_only: bool = False
     ) -> list[int]:
         """指定したコードとマッチする箇所の検索
@@ -197,7 +229,7 @@ class GcodeParser:
             start_i   : 検索を開始する index
             end_i     : 検索を終了する index
             first_only: ヒットする箇所が複数ある時，最初のヒットで検索を終了するかどうか
-        
+
         Returns:
             マッチした Gcode の最初の index  (絶対位置)
             first_only が True の時，最初にマッチした箇所のみを返す
@@ -220,18 +252,18 @@ class GcodeParser:
         """
         gline = glines.glines.pop(0)
         indices = self.find_command(gline.command, gline.params, start_i, end_i, first_only)
-        
+
         if glines:
             next_i = [i + 1 for i in indices]
             for i, start_i in enumerate(next_i):
                 glines_ = copy.deepcopy(glines)
                 if len(self.match_lines(glines_, start_i, start_i + 1, first_only)) == 0:
-                    indices[i] = None
+                    indices[i] = -1
 
                 if first_only:
                     break
 
-        return [index for index in indices if index is not None]
+        return [index for index in indices if index != -1]
 
 
 if __name__ == "__main__":
