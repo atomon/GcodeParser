@@ -63,7 +63,7 @@ class GcodeParser:
     ) -> "GcodeParser":
         re_not_comennt = r'(?!\( *.+)'  # commnet flag: ()
         re_command = r'(G|M|T)(\d+)'
-        re_param = r'(([ \t]*(?!G|M|g|m)[A-Z][-\d\.]*)*)'
+        re_param = r'(([ \t]*(?!G|M|T|g|m|t)[A-Z][-\d\.]*)*)'
         re_comment = r'[ \t]*(\([ \t]*.*)?|(\([ \t]*(.+))'
         re_splitter = re_not_comennt + re_command + re_param + re_comment
 
@@ -74,7 +74,7 @@ class GcodeParser:
             else:
                 gcodes += [('', '', '', '', '', '', '')]
 
-        re_param_splitter = r'[ \t]*(?!G|M|g|m)([A-Z])([-\d\.]*)'
+        re_param_splitter = r'[ \t]*(?!G|M|T|g|m|t)([A-Z])([-\d\.]*)'
         gcodeline: list = []
         for gcode in gcodes:
             param_list = re.findall(re_param_splitter, gcode[2])
@@ -90,7 +90,7 @@ class GcodeParser:
 
             else:
                 comment = gcode[5]
-
+            print(command)
             gcodeline.append(GcodeLine(command, params, comment))
 
         return cls(gcodeline)
@@ -111,6 +111,7 @@ if __name__ == "__main__":
     gcode = """G0 X46.2033 Y23.673 Z23.6739\n
                G10 X46.2033 Y23.673 Z23.6739\n
                (asdfbth12367G12 X12)\n
+               M06 T1\n
                G0 X46.2033 Y23.673 Z23.6739\n
                G0 X46.2033 Y23.673 Z23.6739 (asdfrg)\n
                M30\n"""
